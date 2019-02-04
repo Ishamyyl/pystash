@@ -1,0 +1,11 @@
+#:kivy 1.10.1
+#:import Thread threading.Thread
+
+<Root>:
+    b_test: b_test
+    cols: 2
+    Button:
+        id: b_test
+        text: "test"
+        pos: 500, 300
+        on_release: Thread(target=root.test).start()
