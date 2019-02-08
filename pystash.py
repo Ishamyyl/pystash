@@ -1,6 +1,8 @@
 from json import dumps
 from time import sleep
 
+import requests
+
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.config import ConfigParser
@@ -22,9 +24,7 @@ settings_config = {
 class Root(GridLayout):
 
     def test(self):
-        sleep(5)
-        Clock.schedule_once(lambda dt: setattr(self.b_test, 'text', 'done'))
-        sleep(1)
+        r = requests.get('https://www.pathofexile.com/api/public-stash-tabs', cookies={'': ''})
         Clock.schedule_once(lambda dt: setattr(self.b_test, 'text', 'test'))
 
 
