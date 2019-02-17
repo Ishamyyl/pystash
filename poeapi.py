@@ -1,68 +1,150 @@
 import asyncio
+import re
 from collections import defaultdict
 from itertools import chain
 from json import load
-
-import aiohttp
-from tinydb import TinyDB, Query
-from tinymongo import TinyMongoClient
 from pathlib import Path
 from tempfile import TemporaryFile
 
+import aiohttp
+from tinydb import Query, TinyDB
+from tinymongo import TinyMongoClient
+
 u = 'https://www.pathofexile.com'
+c = 'POESESSID'
+s = '19d78642465bd034a9e3034cfd1d73e7'
+
+dps_types = {9, 10, 11}
+
+re_stat_range = re.compile(r'Adds (\d+ to \d+) (.+)')
+re_stat = re.compile(r'^(?:Gain )?([-+]?\d+(?:\.\d+)?)%? (?:to |of )?(.+)')
+re_number = re.compile(r'\d+')
+
+
+def avg(nums):
+    return sum(map(int, nums))/len(nums)
 
 
 def process_item(e):
-    if 'category' in e:
-        if 'currency' in e['category']:
-            return False
-        if 'maps' in e['category']:
-            return False
-    if 'league' in e:
-        del e['league']
-    if 'verified' in e:
-        del e['verified']
-    if 'frameType' in e:
-        del e['frameType']
-    if 'secDescrText' in e:
-        del e['secDescrText']
-    if 'descrText' in e:
-        del e['descrText']
-    if 'verified' in e:
-        del e['verified']
-    if 'flavourTextParsed' in e:
-        del e['flavourTextParsed']
-    if 'flavourText' in e:
-        del e['flavourText']
-    if 'requirements' in e:
-        e['mapped_requirements'] = {i['name']: i['values'][0][0] for i in e['requirements']}
-        # del e['requirements']
-    if 'sockets' in e:
-        ss = defaultdict(lambda: defaultdict(str))
-        for s in e['sockets']:
-            ss[str(s['group'])]['seq'] += s['sColour']
-        for g, s in ss.items():
-            ss[g]['size'] = len(s['seq'])
-        e['mapped_sockets'] = ss
-    if 'properties' in e:
-        if e['properties']:
-            first = e['properties'][0]
-            if first['name'] and not first['values'] and first['displayMode'] == 0:
-                e['tags'] = first['name'].split(', ')
-            e['named_properties'] = {i['name']: i["values"][0][0]
-                                     for i in e['properties'] if i["values"] and 'name' in i}
-            e['typed_properties'] = {i['type']: i["values"][0][0]
-                                     for i in e['properties'] if i["values"] and 'type' in i}
-            # del e['properties']
-    if 'socketedItems' in e:
-        if e['socketedItems']:
-            # for i in filter(None, map(process_item, e['socketedItems'])):
-            #     items.replace_one({'id': i['id']}, i, {'upsert': True})
-            # for i in filter(None, map(process_item, e['socketedItems'])):
-            #     items.upsert(i, Item.id == i['id'])
-            items.insert_multiple(list(filter(None, map(process_item, e['socketedItems']))))
-        del e['socketedItems']
-    return e
+    # Lord help me
+    try:
+        calcs = []
+        if 'category' in e:
+            if 'currency' in e['category']:
+                return False
+            if 'maps' in e['category']:
+                return False
+            # mps.append([{'group': k, 'category': v} for k, v in e['category'].items()][0])
+        if 'league' in e:
+            del e['league']
+        if 'verified' in e:
+            del e['verified']
+        if 'vaal' in e:
+            del e['vaal']
+        if 'frameType' in e:
+            del e['frameType']
+        if 'secDescrText' in e:
+            del e['secDescrText']
+        if 'descrText' in e:
+            del e['descrText']
+        if 'verified' in e:
+            del e['verified']
+        if 'flavourTextParsed' in e:
+            del e['flavourTextParsed']
+        if 'flavourText' in e:
+            del e['flavourText']
+        if 'requirements' in e:
+            e['requirements'] = {i['name']: float(i['values'][0][0]) for i in e['requirements']}
+            del e['requirements']
+        if 'sockets' in e:
+            # flatten the shape a bit, mostly ['sockets][i]['group'] becomes index in ['sockets'][i]
+            # your group is your index in the list, and there will never be more than 6 groups
+            ss = [{'seq': ''} for _ in range(6)]
+            for s in e['sockets']:
+                ss[s['group']]['seq'] += s['sColour']
+            ss = list(filter(lambda i: bool(i['seq']), ss))
+            for s in ss:
+                s['size'] = len(s['seq'])
+            e['sockets'] = ss
+        if 'properties' in e:
+            if e['properties']:
+                ps = e['properties']
+                damage_types = []
+                first = ps[0]
+                if first['name'] and not first['values'] and first['displayMode'] == 0:
+                    e['tags'] = first['name'].split(', ')
+                    del ps[0]
+                for p in ps:
+                    v = p['values'][0][0]
+                    if 'type' in p:
+                        # some properties need special processing, because they have a range of values and need the value of another property
+                        if p['type'] in dps_types:
+                            n = p['name'].split(' ')[0]
+                            sum_avg_dmg = sum(map(avg, (v[0].split('-') for v in p['values'])))
+                            damage_types.append((n, sum_avg_dmg))
+                            calcs.append({'name': p['name'].title(), 'value': sum_avg_dmg})
+                            continue
+                            # capture a value to use in later calculation
+                        elif p['type'] == 13:
+                            aps = float(v)
+                            calcs.append({'name': 'Attacks Per Second', 'value': aps})
+                            continue
+                    r = re_number.findall(v)
+                    calcs.append({'name': p['name'].title(), 'value': float(r[0]) if r else v})
+                dps = 0.0
+                for n, v in damage_types:
+                    d = v * aps
+                    dps += d
+                    calcs.append({'name': f'{n} DPS', 'value': d})
+                if dps:
+                    calcs.append({'name': 'DPS', 'value': dps})
+                del e['properties']
+        if 'implicitMods' in e:
+            if e['implicitMods']:
+                for i, m in enumerate(e['implicitMods']):
+                    m = m.replace('\n', ' ')
+                    r = re_stat.match(m)
+                    if r:
+                        g = r.groups()
+                        calcs.append({'name': g[1].title(), 'value': float(g[0])})
+                        e['implicitMods'][i] = False
+                        continue
+                    r = re_stat_range.match(m)
+                    if r:
+                        g = r.groups()
+                        calcs.append({'name': g[1].title(), 'value': avg(g[0].split(' to '))})
+                        e['implicitMods'][i] = False
+                        continue
+                e['implicitMods'] = list(filter(None, e['implicitMods']))
+        if 'gems' not in e['category'] and 'explicitMods' in e:
+            if e['explicitMods']:
+                for i, m in enumerate(e['explicitMods']):
+                    m = m.replace('\n', ' ')
+                    r = re_stat.match(m)
+                    if r:
+                        g = r.groups()
+                        calcs.append({'name': g[1].title(), 'value': float(g[0])})
+                        e['explicitMods'][i] = False
+                        continue
+                    r = re_stat_range.match(m)
+                    if r:
+                        g = r.groups()
+                        calcs.append({'name': g[1].title(), 'value': avg(g[0].split(' to '))})
+                        e['explicitMods'][i] = False
+                        continue
+                e['explicitMods'] = list(filter(None, e['explicitMods']))
+        if 'socketedItems' in e:
+            if e['socketedItems']:
+                # for i in filter(None, map(process_item, e['socketedItems'])):
+                #     items.replace_one({'id': i['id']}, i, {'upsert': True})
+                # for i in filter(None, map(process_item, e['socketedItems'])):
+                #     items.upsert(i, Item.id == i['id'])
+                items.insert_multiple(list(filter(None, map(process_item, e['socketedItems']))))
+            del e['socketedItems']
+        e['mods'] = calcs
+        return e
+    except Exception as exptn:
+        raise type(exptn)(*exptn.args, e).with_traceback(exptn.__traceback__)
 
 
 # TinyDB.table_class = SmartCacheTable
@@ -124,7 +206,6 @@ async def get_stash_tabs():
         tabs_to_get = (i['i'] for i in tabs.search(Tab.type.one_of(['NormalStash', 'PremiumStash', 'QuadStash'])))
 
         await asyncio.gather(*(get_tab(session, t, params, semaphore) for t in tabs_to_get))
-
 
 asyncio.run(get_stash_tabs())
 
