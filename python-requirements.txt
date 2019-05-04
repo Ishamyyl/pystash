@@ -1,8 +1,0 @@
-Cython
-Kivy
-kivy.deps.angle
-kivy.deps.sdl2
-tinydb
-tinymongo
-tinydb_smartcache
-ujson
