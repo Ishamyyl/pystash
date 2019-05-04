@@ -10,26 +10,28 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.settings import SettingsWithSidebar
 
 settings_config = {
-    'auth': dumps([
-        {
-            "type": "bool",
-            "section": "auth",
-            "key": "uses_session_token",
-            "title": "Use the Session Token instead?"
-        }
-    ])
+    "auth": dumps(
+        [
+            {
+                "type": "bool",
+                "section": "auth",
+                "key": "uses_session_token",
+                "title": "Use the Session Token instead?",
+            }
+        ]
+    )
 }
 
 
 class Root(GridLayout):
-
     def test(self):
-        r = requests.get('https://www.pathofexile.com/api/public-stash-tabs', cookies={'': ''})
-        Clock.schedule_once(lambda dt: setattr(self.b_test, 'text', 'test'))
+        r = requests.get(
+            "https://www.pathofexile.com/api/public-stash-tabs", cookies={"": ""}
+        )
+        Clock.schedule_once(lambda dt: setattr(self.b_test, "text", "test"))
 
 
 class Pystash(App):
-
     def build(self):
         self.use_kivy_settings = False
         self.settings_cls = SettingsWithSidebar
@@ -42,5 +44,5 @@ class Pystash(App):
             settings.add_json_panel(sec, self.config, data=settings_config[sec])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     Pystash().run()
