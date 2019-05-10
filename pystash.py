@@ -1,48 +1,68 @@
-from json import dumps
-from time import sleep
+import base64
+import os
+import sys
+from dataclasses import asdict, dataclass
 
-import requests
+from cefpython3 import cefpython as cef
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from kivy.app import App
-from kivy.clock import Clock
-from kivy.config import ConfigParser
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.settings import SettingsWithSidebar
-
-settings_config = {
-    "auth": dumps(
-        [
-            {
-                "type": "bool",
-                "section": "auth",
-                "key": "uses_session_token",
-                "title": "Use the Session Token instead?",
-            }
-        ]
-    )
-}
+# class AppHandler:
+#     def OnAfterCreated(self, browser, *args, **kwargs):
+#         """Called after a new browser is created."""
+#         # Errors here will be intercepted in DisplayHandler.OnConsoleMessage.
+#         print("GlobalHandler.OnAfterCreated", args, kwargs)
 
 
-class Root(GridLayout):
-    def test(self):
-        r = requests.get(
-            "https://www.pathofexile.com/api/public-stash-tabs", cookies={"": ""}
+class BrowserHandler:
+    def OnLoadingStateChange(self, browser, is_loading, *args, **kwargs):
+        """Called when the loading state has changed."""
+        if not is_loading:
+            pass
+
+
+# BrowserSettings = {"universal_access_from_file_urls_allowed": True}
+
+
+class App:
+    def __init__(self):
+        sys.excepthook = cef.ExceptHook
+        env = Environment(
+            loader=FileSystemLoader("templates"), autoescape=select_autoescape(["html"])
         )
-        Clock.schedule_once(lambda dt: setattr(self.b_test, "text", "test"))
+        cef.Initialize(
+            settings={
+                "command_line_args_disabled": True,
+                "downloads_enabled": False,
+                "user_agent": "PyStash/0.0.1",
+                "context_menu": {
+                    "enabled": True,
+                    "navigation": False,
+                    "print": False,
+                    "view_source": False,
+                    "external_browser": False,
+                    # "devtools": False,
+                },
+            }
+        )
+        # cef.SetGlobalClientHandler(AppHandler())
 
+        browser = cef.CreateBrowserSync(
+            # url=cef.GetDataUrl(env.get_template("test.html").render(test="hi")),
+            url=os.path.join(os.path.dirname(os.path.realpath(__file__)), "index.html"),
+            window_title="Tutorial",
+            # settings=BrowserSettings,
+        )
+        browser.SetClientHandler(BrowserHandler())
 
-class Pystash(App):
-    def build(self):
-        self.use_kivy_settings = False
-        self.settings_cls = SettingsWithSidebar
-        return Root()
+        bindings = cef.JavascriptBindings()
+        bindings.SetObject("app", self)
+        browser.SetJavascriptBindings(bindings)
 
-    def build_settings(self, settings):
-        self.config = ConfigParser()
-        self.config.read(self.get_application_config())
-        for sec in self.config.sections():
-            settings.add_json_panel(sec, self.config, data=settings_config[sec])
+        self.browser = browser
+
+        cef.MessageLoop()
+        cef.Shutdown()
 
 
 if __name__ == "__main__":
-    Pystash().run()
+    App()
