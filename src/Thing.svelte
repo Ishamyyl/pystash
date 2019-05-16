@@ -1,5 +1,5 @@
 <script>
-  export let login;
+  export let value;
 </script>
 
-<p>{login}</p>
+<p>{value}</p>
