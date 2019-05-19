@@ -11,7 +11,10 @@ from tinydb import Query, TinyDB
 
 u = "https://www.pathofexile.com"
 c = "POESESSID"
-s = "19d78642465bd034a9e3034cfd1d73e7"
+s = "8e3956244b1dcc9ee5e5c7654c84125f"
+
+db_loc = Path("~/.pystash").expanduser()
+db_loc.mkdir(exist_ok=True)
 
 # TinyDB
 db = TinyDB(db_loc / "poe.json")
@@ -156,8 +159,6 @@ def process_item(e):
 
 
 # TinyDB.table_class = SmartCacheTable
-db_loc = Path("~/.pystash").expanduser()
-db_loc.mkdir(exist_ok=True)
 
 # TinyMongo
 # connection = TinyMongoClient(db_loc / 'poe')

@@ -1,28 +1,49 @@
 <script>
-  import Thing from "./Thing.svelte";
-  import { from } from "rxjs";
-  import { scan, tap } from "rxjs/operators";
+  import ItemList from "./ItemList.svelte";
+  import Modal from "./Modal.svelte";
+  import { AsyncSubject } from "rxjs";
 
-  const things = from([
-    { id: 1, value: 1 },
-    { id: 2, value: 2 },
-    { id: 3, value: 3 },
-    { id: 4, value: 4 }
-  ]).pipe(
-    tap(console.log),
-    scan((a, c) => [...a, c], [])
-  );
+  let show_settings_modal = false;
+  let settings = { poesessid: "" };
+  const settings_sub = new AsyncSubject();
+  settings_sub.subscribe(console.log);
+
+  $: settings_sub.next(settings);
+
+  let items;
+  export function set_item_list(new_items) {
+    items = new_items;
+  }
+
+  function settings_modal_closed(event) {
+    show_settings_modal = false;
+    settings_sub.complete();
+  }
 </script>
 
-{#each $things as t (t.id)}
-  <Thing {...t} />
-{/each}
+<style>
+  :global(body) {
+    background-color: #000;
+    background: gray url("teee.png") repeat 0 0;
+    animation: shaper_slide 25s linear infinite;
+    /* grid layout */
+    display: grid;
+    padding: 0.5em;
+    grid-gap: 0.5em;
+    grid:
+      "menu menu menu menu" min-content
+      "search items items items" 1fr
+      / min-content 1fr;
+  }
+</style>
 
-<!-- {#each things as thing (thing.id)}
-  <Thing value={thing.value} />
-{/each} -->
+<button on:click={() => (show_settings_modal = true)}>Settings</button>
 
-<!-- {#each $values as t (t.id)}
-  <div>{t}</div>
-  <Thing value={t.value} />
-{/each} -->
+{#if show_settings_modal}
+  <Modal on:close={settings_modal_closed}>
+    <p slot="header">Settings</p>
+    <span slot="closer">Save</span>
+    <input type="text" bind:value={settings.poesessid} />
+    <p>hi</p>
+  </Modal>
+{/if}

@@ -17,7 +17,7 @@
 /character-window/get-stash-items&league=:league&tabs=:showTabsInfo&tabIndex=:index
 ```
 :league {Standard, Hardcore, ...}
-:showTabsInfo {0, 1} -- 1 to shows tabs name, position, colors
+:showTabsInfo {0, 1} -- 1 to show tabs name, position, colors
 :index {0..N}
 ```
 

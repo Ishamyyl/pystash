@@ -17,7 +17,15 @@ class BrowserHandler:
     def OnLoadingStateChange(self, browser, is_loading, *args, **kwargs):
         """Called when the loading state has changed."""
         if not is_loading:
-            pass
+            browser.ExecuteFunction(
+                "js.set_item_list",
+                [
+                    {"id": 1, "name": 1},
+                    {"id": 2, "name": 2},
+                    {"id": 3, "name": 3},
+                    {"id": 4, "name": 4},
+                ],
+            )
 
 
 # BrowserSettings = {"universal_access_from_file_urls_allowed": True}
@@ -48,14 +56,14 @@ class App:
 
         browser = cef.CreateBrowserSync(
             # url=cef.GetDataUrl(env.get_template("test.html").render(test="hi")),
-            url=os.path.join(os.path.dirname(os.path.realpath(__file__)), "index.html"),
-            window_title="Tutorial",
+            url=os.path.join(os.path.dirname(os.path.realpath(__file__)), "public/index.html"),
+            window_title="PyStash",
             # settings=BrowserSettings,
         )
         browser.SetClientHandler(BrowserHandler())
 
         bindings = cef.JavascriptBindings()
-        bindings.SetObject("app", self)
+        bindings.SetObject("py", self)
         browser.SetJavascriptBindings(bindings)
 
         self.browser = browser
